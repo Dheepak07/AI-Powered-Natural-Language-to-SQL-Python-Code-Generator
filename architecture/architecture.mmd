@@ -1,0 +1,30 @@
+flowchart TD
+    U[User] -->|Types a business question| UI[Streamlit UI - frontend/app.py]
+
+    UI --> CHAIN[NL2SQLChain - src/ai/chain.py]
+
+    CHAIN --> SCHEMA[connector.get_schema_info / schema_to_text]
+    SCHEMA -->|SQLAlchemy inspector| DB[(MySQL - ecommerce_db)]
+
+    CHAIN --> PROMPT[prompt_builder: schema-aware system + user prompt]
+    PROMPT --> LLM[ChatAnthropic - claude-sonnet-4-6 via LangChain]
+    LLM --> PARSER[parser.parse_ai_response]
+    PARSER --> AIRESP[AIResponse: sql, pandas_code, explanation, visualization]
+
+    AIRESP --> VALIDATOR[SQLValidator - src/validation/sql_validator.py]
+    VALIDATOR -->|Stage 1: blocklist DROP/DELETE/UPDATE/etc| VALIDATOR
+    VALIDATOR -->|Stage 2: SELECT/WITH only| VALIDATOR
+    VALIDATOR -->|Stage 3: sqlparse parseability| VALIDATOR
+    VALIDATOR -->|Stage 4: schema table check| VALIDATOR
+
+    VALIDATOR -->|valid| EXECUTOR[executor.execute_query]
+    EXECUTOR -->|SQLAlchemy engine| DB
+    DB --> EXECUTOR
+    EXECUTOR --> RESULT[QueryResult: DataFrame + timing]
+
+    RESULT --> UI
+    AIRESP -->|SQL tab, Python/Pandas tab| UI
+    VALIDATOR -->|validation status/warnings| UI
+    UI -->|Answer tabs: SQL, Python, Results + CSV download| U
+
+    UI -->|per-question| LOG[logger: console + rotating file - logs/app.log]
